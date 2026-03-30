@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile with trial and access status",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "trialEndsAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["trial", "liberado", "bloqueado"] },
+        "role": { "type": "string", "enum": ["user", "admin"] }
+      },
+      "required": ["uid", "name", "email", "createdAt", "trialEndsAt", "status", "role"]
+    },
+    "Login": {
+      "title": "Login History",
+      "description": "History of user logins",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "userEmail", "timestamp"]
+    },
+    "Progress": {
+      "title": "Game Progress",
+      "description": "User progress in the game worlds",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "world": { "type": "integer" },
+        "stars": { "type": "integer" },
+        "completed": { "type": "boolean" },
+        "lastPlayed": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "world", "stars", "completed", "lastPlayed"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents"
+    },
+    "/logins/{loginId}": {
+      "schema": "Login",
+      "description": "Login history logs"
+    },
+    "/progress/{progressId}": {
+      "schema": "Progress",
+      "description": "User game progress"
+    }
+  }
+}

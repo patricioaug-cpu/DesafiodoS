@@ -1,0 +1,114 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (matches auth.uid)
+    // Fields:
+    //   - name: string (required)
+    //   - email: string (required, email format)
+    //   - createdAt: timestamp (required)
+    //   - trialEndsAt: timestamp (required)
+    //   - status: string (required, 'trial'|'liberado'|'bloqueado')
+    //   - role: string (required, 'user'|'admin')
+    //
+    // Collection: logins
+    // Fields:
+    //   - userId: string (required)
+    //   - userName: string (required)
+    //   - userEmail: string (required)
+    //   - timestamp: timestamp (required)
+    //
+    // Collection: progress
+    // Fields:
+    //   - userId: string (required)
+    //   - world: int (required)
+    //   - stars: int (required)
+    //   - completed: bool (required)
+    //   - lastPlayed: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.email == "patricioaug@gmail.com" ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['name', 'email', 'createdAt', 'status', 'role']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             isValidEmail(data.email) &&
+             data.createdAt is timestamp &&
+             (data.trialEndsAt == null || data.trialEndsAt is timestamp) &&
+             (data.firstLoginAt == null || data.firstLoginAt is timestamp) &&
+             data.status in ['trial', 'liberado', 'bloqueado', 'solicitado'] &&
+             data.role in ['user', 'admin'];
+    }
+
+    function isValidLogin(data) {
+      return data.keys().hasAll(['userId', 'userName', 'userEmail', 'timestamp']) &&
+             data.userId is string &&
+             data.userName is string &&
+             data.userEmail is string &&
+             data.timestamp is timestamp;
+    }
+
+    function isValidProgress(data) {
+      return data.keys().hasAll(['userId', 'world', 'stars', 'completed', 'lastPlayed']) &&
+             data.userId is string &&
+             data.world is int &&
+             data.stars is int &&
+             data.completed is bool &&
+             data.lastPlayed is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    match /logins/{loginId} {
+      // Only admins can read login history
+      allow read: if isAdmin();
+      
+      // Authenticated users can create login records for themselves
+      allow create: if isAuthenticated() && isValidLogin(request.resource.data) && 
+                    request.resource.data.userId == request.auth.uid;
+    }
+
+    match /progress/{progressId} {
+      // Users can read/write their own progress, admins can read all
+      allow read: if (isAuthenticated() && resource.data.userId == request.auth.uid) || isAdmin();
+      
+      allow create: if isAuthenticated() && isValidProgress(request.resource.data) && 
+                    request.resource.data.userId == request.auth.uid;
+      
+      allow update: if isAuthenticated() && isValidProgress(request.resource.data) && 
+                    resource.data.userId == request.auth.uid &&
+                    request.resource.data.userId == request.auth.uid;
+    }
+  }
+}
